@@ -1,0 +1,1204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dream League 11v11 - Real Players</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            background: #080808;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            overflow: hidden;
+            color: white;
+        }
+
+        #gameContainer {
+            position: relative;
+            box-shadow: 0 0 50px rgba(0,0,0,0.9);
+        }
+
+        canvas {
+            display: block;
+            border: 3px solid #222;
+        }
+
+        /* HUD */
+        #hud {
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            pointer-events: none;
+            padding: 12px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            z-index: 5;
+        }
+
+        .score-panel {
+            background: rgba(0,0,0,0.8);
+            backdrop-filter: blur(12px);
+            padding: 10px 20px;
+            border-radius: 10px;
+            border: 1px solid rgba(255,255,255,0.08);
+            text-align: center;
+            min-width: 120px;
+        }
+
+        .team-name {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin-bottom: 3px;
+            opacity: 0.85;
+            font-weight: 700;
+        }
+
+        .score {
+            font-size: 32px;
+            font-weight: 800;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .blue-team { color: #29b6f6; }
+        .red-team { color: #ef5350; }
+
+        #timer {
+            background: rgba(0,0,0,0.8);
+            backdrop-filter: blur(12px);
+            padding: 8px 24px;
+            border-radius: 20px;
+            font-size: 18px;
+            font-weight: 700;
+            font-variant-numeric: tabular-nums;
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+
+        #matchLog {
+            position: absolute;
+            top: 70px;
+            left: 50%;
+            transform: translateX(-50%);
+            text-align: center;
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        .log-entry {
+            background: rgba(0,0,0,0.75);
+            padding: 6px 16px;
+            border-radius: 16px;
+            font-size: 13px;
+            margin-bottom: 4px;
+            opacity: 0;
+            animation: fadeInOut 3s forwards;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        @keyframes fadeInOut {
+            0% { opacity: 0; transform: translateY(-10px); }
+            10% { opacity: 1; transform: translateY(0); }
+            80% { opacity: 1; }
+            100% { opacity: 0; transform: translateY(-5px); }
+        }
+
+        #powerMeter {
+            position: absolute;
+            bottom: 25px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 180px;
+            height: 10px;
+            background: rgba(0,0,0,0.6);
+            border-radius: 5px;
+            overflow: hidden;
+            border: 1px solid rgba(255,255,255,0.15);
+            opacity: 0;
+            transition: opacity 0.2s;
+            z-index: 5;
+        }
+
+        #powerMeter.active { opacity: 1; }
+        #powerFill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #29b6f6, #ffca28, #ef5350);
+            transition: width 0.05s linear;
+        }
+
+        #controls {
+            position: absolute;
+            bottom: 8px;
+            left: 12px;
+            font-size: 10px;
+            color: rgba(255,255,255,0.3);
+            pointer-events: none;
+            line-height: 1.5;
+            z-index: 5;
+        }
+
+        /* POST MATCH SCREEN */
+        #postMatch {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.92);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 20;
+            backdrop-filter: blur(8px);
+        }
+
+        #postMatch.show { display: flex; }
+
+        .trophy-container {
+            position: relative;
+            margin-bottom: 20px;
+        }
+
+        .trophy {
+            font-size: 100px;
+            filter: drop-shadow(0 0 30px rgba(255,215,0,0.5));
+            animation: trophyPulse 2s infinite;
+        }
+
+        @keyframes trophyPulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.08); }
+        }
+
+        .motm-card {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            border: 2px solid #ffd700;
+            border-radius: 16px;
+            padding: 24px 36px;
+            text-align: center;
+            min-width: 320px;
+            box-shadow: 0 10px 40px rgba(255,215,0,0.15);
+            margin-bottom: 24px;
+        }
+
+        .motm-label {
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            color: #ffd700;
+            margin-bottom: 8px;
+            font-weight: 700;
+        }
+
+        .motm-name {
+            font-size: 32px;
+            font-weight: 800;
+            margin-bottom: 4px;
+        }
+
+        .motm-team {
+            font-size: 14px;
+            opacity: 0.7;
+            margin-bottom: 12px;
+        }
+
+        .motm-rating {
+            font-size: 48px;
+            font-weight: 900;
+            color: #ffd700;
+        }
+
+        .motm-stats {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-top: 16px;
+            font-size: 13px;
+        }
+
+        .motm-stat {
+            text-align: center;
+        }
+
+        .motm-stat-value {
+            font-size: 18px;
+            font-weight: 700;
+            color: white;
+        }
+
+        .motm-stat-label {
+            font-size: 11px;
+            opacity: 0.6;
+            text-transform: uppercase;
+        }
+
+        .final-score {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 20px;
+        }
+
+        .btn {
+            background: #ffd700;
+            color: #1a1a2e;
+            border: none;
+            padding: 12px 36px;
+            font-size: 16px;
+            font-weight: 700;
+            border-radius: 30px;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 20px rgba(255,215,0,0.3);
+        }
+
+        #bigMessage {
+            position: absolute;
+            top: 45%; left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 56px;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            text-shadow: 0 4px 20px rgba(0,0,0,0.9);
+            opacity: 0;
+            pointer-events: none;
+            transition: all 0.5s;
+            z-index: 10;
+            text-align: center;
+            white-space: pre-line;
+        }
+
+        #bigMessage.show {
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(1.05);
+        }
+
+        /* Confetti canvas overlay */
+        #confetti {
+            position: absolute;
+            top: 0; left: 0;
+            pointer-events: none;
+            z-index: 15;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas" width="1100" height="720"></canvas>
+        <canvas id="confetti"></canvas>
+        
+        <div id="hud">
+            <div class="score-panel">
+                <div class="team-name blue-team">Galacticos FC</div>
+                <div class="score blue-team" id="scoreBlue">0</div>
+            </div>
+            <div id="timer">00:00</div>
+            <div class="score-panel">
+                <div class="team-name red-team">Legends FC</div>
+                <div class="score red-team" id="scoreRed">0</div>
+            </div>
+        </div>
+
+        <div id="matchLog"></div>
+        <div id="powerMeter"><div id="powerFill"></div></div>
+        <div id="bigMessage"></div>
+        
+        <div id="controls">
+            WASD/Arrows: Move | Shift: Sprint | Space: Shoot (hold) | Q: Pass | E: Switch | R: Reset
+        </div>
+
+        <div id="postMatch">
+            <div class="trophy-container">
+                <div class="trophy">🏆</div>
+            </div>
+            <div class="final-score" id="finalScore">Galacticos 0 - 0 Legends</div>
+            <div class="motm-card" id="motmCard">
+                <div class="motm-label">Man of the Match</div>
+                <div class="motm-name" id="motmName">--</div>
+                <div class="motm-team" id="motmTeam">--</div>
+                <div class="motm-rating" id="motmRating">0.0</div>
+                <div class="motm-stats">
+                    <div class="motm-stat">
+                        <div class="motm-stat-value" id="motmGoals">0</div>
+                        <div class="motm-stat-label">Goals</div>
+                    </div>
+                    <div class="motm-stat">
+                        <div class="motm-stat-value" id="motmAssists">0</div>
+                        <div class="motm-stat-label">Assists</div>
+                    </div>
+                    <div class="motm-stat">
+                        <div class="motm-stat-value" id="motmPasses">0</div>
+                        <div class="motm-stat-label">Passes</div>
+                    </div>
+                    <div class="motm-stat">
+                        <div class="motm-stat-value" id="motmTackles">0</div>
+                        <div class="motm-stat-label">Tackles</div>
+                    </div>
+                    <div class="motm-stat">
+                        <div class="motm-stat-value" id="motmDistance">0</div>
+                        <div class="motm-stat-label">Distance</div>
+                    </div>
+                </div>
+            </div>
+            <button class="btn" onclick="resetMatch()">Play Again</button>
+        </div>
+    </div>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const confettiCanvas = document.getElementById('confetti');
+const confettiCtx = confettiCanvas.getContext('2d');
+confettiCanvas.width = 1100; confettiCanvas.height = 720;
+
+// ==================== CONFIG ====================
+const FIELD = { x: 70, y: 55, w: 960, h: 610, goalW: 130, goalD: 30 };
+const MATCH_LENGTH = 240; // 4 minutes
+const HALF_TIME = 120;
+
+// ==================== STATE ====================
+let gameState = 'kickoff';
+let gameTime = 0;
+let lastTime = 0;
+let score = { blue: 0, red: 0 };
+let camera = { x: 0, y: 0 };
+let ballOwner = null;
+let chargingShot = false;
+let shotPower = 0;
+let selectedPlayerIdx = 6; // Start with a midfielder
+let matchLog = [];
+let lastGoalScorer = null;
+let confetti = [];
+
+// ==================== REAL PLAYER DATABASE ====================
+const PLAYER_DB = {
+    blue: [
+        { name: "Courtois", role: "gk", stats: { pace: 45, shoot: 20, pass: 55, defend: 85, physical: 88 } },
+        { name: "A. Davies", role: "lb", stats: { pace: 94, shoot: 60, pass: 72, defend: 78, physical: 82 } },
+        { name: "Van Dijk", role: "cb", stats: { pace: 72, shoot: 55, pass: 75, defend: 93, physical: 90 } },
+        { name: "Ramos", role: "cb", stats: { pace: 68, shoot: 50, pass: 70, defend: 88, physical: 86 } },
+        { name: "Carvajal", role: "rb", stats: { pace: 80, shoot: 55, pass: 78, defend: 82, physical: 80 } },
+        { name: "Kanté", role: "cdm", stats: { pace: 78, shoot: 50, pass: 76, defend: 90, physical: 85 } },
+        { name: "De Bruyne", role: "cm", stats: { pace: 76, shoot: 85, pass: 96, defend: 65, physical: 78 } },
+        { name: "Modrić", role: "cm", stats: { pace: 72, shoot: 78, pass: 93, defend: 68, physical: 70 } },
+        { name: "Mbappé", role: "lw", stats: { pace: 97, shoot: 88, pass: 80, defend: 40, physical: 82 } },
+        { name: "Haaland", role: "st", stats: { pace: 88, shoot: 95, pass: 65, defend: 45, physical: 92 } },
+        { name: "Messi", role: "rw", stats: { pace: 82, shoot: 92, pass: 95, defend: 38, physical: 68 } }
+    ],
+    red: [
+        { name: "Donnarumma", role: "gk", stats: { pace: 40, shoot: 15, pass: 50, defend: 82, physical: 86 } },
+        { name: "T. Hernández", role: "lb", stats: { pace: 90, shoot: 65, pass: 75, defend: 80, physical: 84 } },
+        { name: "Rúben Dias", role: "cb", stats: { pace: 68, shoot: 45, pass: 72, defend: 91, physical: 88 } },
+        { name: "Rüdiger", role: "cb", stats: { pace: 78, shoot: 50, pass: 68, defend: 87, physical: 90 } },
+        { name: "Hakimi", role: "rb", stats: { pace: 92, shoot: 62, pass: 76, defend: 78, physical: 80 } },
+        { name: "Rodri", role: "cm", stats: { pace: 68, shoot: 72, pass: 88, defend: 86, physical: 84 } },
+        { name: "Bellingham", role: "cm", stats: { pace: 82, shoot: 82, pass: 84, defend: 78, physical: 86 } },
+        { name: "De Jong", role: "cm", stats: { pace: 78, shoot: 68, pass: 90, defend: 72, physical: 80 } },
+        { name: "Vinícius", role: "lw", stats: { pace: 95, shoot: 82, pass: 78, defend: 42, physical: 80 } },
+        { name: "Ronaldo", role: "st", stats: { pace: 80, shoot: 94, pass: 72, defend: 40, physical: 92 } },
+        { name: "Salah", role: "rw", stats: { pace: 91, shoot: 87, pass: 80, defend: 50, physical: 78 } }
+    ]
+};
+
+// ==================== INPUT ====================
+const keys = {};
+document.addEventListener('keydown', e => {
+    keys[e.key.toLowerCase()] = true;
+    if (e.key.toLowerCase() === 'e') switchPlayer();
+    if (e.key.toLowerCase() === 'q') attemptPass();
+    if (e.key.toLowerCase() === 'r') resetMatch();
+});
+document.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
+
+// ==================== UTILITIES ====================
+function dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
+function angleBetween(a, b) { return Math.atan2(b.y - a.y, b.x - a.x); }
+function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
+function lerp(a, b, t) { return a + (b - a) * t; }
+function rand(min, max) { return Math.random() * (max - min) + min; }
+
+function addLog(text, color = 'white') {
+    const el = document.createElement('div');
+    el.className = 'log-entry';
+    el.textContent = text;
+    el.style.color = color;
+    document.getElementById('matchLog').appendChild(el);
+    setTimeout(() => el.remove(), 3000);
+}
+
+function showMessage(text, duration = 2000) {
+    const el = document.getElementById('bigMessage');
+    el.textContent = text;
+    el.classList.add('show');
+    setTimeout(() => el.classList.remove('show'), duration);
+}
+
+// ==================== BALL ====================
+const ball = {
+    x: canvas.width / 2, y: canvas.height / 2,
+    vx: 0, vy: 0,
+    radius: 6,
+    friction: 0.988,
+    minSpeed: 0.12,
+    
+    update() {
+        this.vx *= this.friction;
+        this.vy *= this.friction;
+        if (Math.abs(this.vx) < this.minSpeed) this.vx = 0;
+        if (Math.abs(this.vy) < this.minSpeed) this.vy = 0;
+        this.x += this.vx;
+        this.y += this.vy;
+        
+        if (this.x < FIELD.x + this.radius) { this.x = FIELD.x + this.radius; this.vx = Math.abs(this.vx) * 0.7; }
+        if (this.x > FIELD.x + FIELD.w - this.radius) { this.x = FIELD.x + FIELD.w - this.radius; this.vx = -Math.abs(this.vx) * 0.7; }
+        if (this.y < FIELD.y + this.radius) { this.y = FIELD.y + this.radius; this.vy = Math.abs(this.vy) * 0.7; }
+        if (this.y > FIELD.y + FIELD.h - this.radius) { this.y = FIELD.y + FIELD.h - this.radius; this.vy = -Math.abs(this.vy) * 0.7; }
+    },
+    
+    draw() {
+        const sx = this.x - camera.x, sy = this.y - camera.y;
+        ctx.fillStyle = 'rgba(0,0,0,0.3)';
+        ctx.beginPath();
+        ctx.ellipse(sx + 1, sy + 3, this.radius, this.radius * 0.5, 0, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.fillStyle = 'white';
+        ctx.beginPath();
+        ctx.arc(sx, sy, this.radius, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.strokeStyle = '#222';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.arc(sx, sy, this.radius - 1.5, 0, Math.PI * 2);
+        ctx.stroke();
+        
+        const speed = Math.hypot(this.vx, this.vy);
+        if (speed > 7) {
+            ctx.strokeStyle = `rgba(255,255,255,${Math.min(0.35, (speed-7)/8)})`;
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(sx, sy);
+            ctx.lineTo(sx - this.vx * 2.5, sy - this.vy * 2.5);
+            ctx.stroke();
+        }
+    }
+};
+
+// ==================== PLAYER ====================
+class Player {
+    constructor(data, x, y, team) {
+        this.name = data.name;
+        this.role = data.role;
+        this.team = team;
+        this.stats = data.stats;
+        this.x = x; this.y = y;
+        this.homeX = x; this.homeY = y;
+        this.vx = 0; this.vy = 0;
+        this.radius = 9;
+        this.stamina = 100;
+        this.hasBall = false;
+        this.tackleCd = 0;
+        this.shootCd = 0;
+        this.facing = 0;
+        this.distCovered = 0;
+        
+        // Match stats
+        this.matchStats = { goals: 0, assists: 0, passes: 0, tackles: 0, shots: 0, keyPasses: 0 };
+    }
+    
+    get speed() {
+        const paceFactor = this.stats.pace / 80;
+        const tired = this.stamina < 25 ? 0.65 : (this.stamina < 50 ? 0.85 : 1);
+        const sprint = (this.team === 'blue' && keys['shift'] && this.stamina > 5 && players.indexOf(this) === selectedPlayerIdx) ? 1.5 : 1;
+        if (this.team === 'blue' && keys['shift'] && players.indexOf(this) === selectedPlayerIdx) this.stamina -= 0.25;
+        else this.stamina = Math.min(100, this.stamina + 0.06);
+        return 2.2 * paceFactor * tired * sprint;
+    }
+    
+    update() {
+        if (this.tackleCd > 0) this.tackleCd--;
+        if (this.shootCd > 0) this.shootCd--;
+        
+        if (this.team === 'blue' && players.indexOf(this) === selectedPlayerIdx) {
+            this.handleInput();
+        } else {
+            this.aiBehavior();
+        }
+        
+        const prevX = this.x, prevY = this.y;
+        this.x += this.vx;
+        this.y += this.vy;
+        this.distCovered += Math.hypot(this.x - prevX, this.y - prevY) * 0.01;
+        
+        const margin = this.role === 'gk' ? 50 : 15;
+        this.x = clamp(this.x, FIELD.x + margin, FIELD.x + FIELD.w - margin);
+        this.y = clamp(this.y, FIELD.y + margin, FIELD.y + FIELD.h - margin);
+        
+        // Ball interaction
+        const d = dist(this, ball);
+        const touchDist = this.radius + ball.radius + 2;
+        
+        if (d < touchDist) {
+            if (!ballOwner) {
+                ballOwner = this;
+                this.hasBall = true;
+            } else if (ballOwner !== this && this.tackleCd === 0) {
+                if (Math.random() > 0.35) {
+                    ballOwner.hasBall = false;
+                    ballOwner = this;
+                    this.hasBall = true;
+                    this.matchStats.tackles++;
+                    const ang = angleBetween(this, ball);
+                    ball.vx = Math.cos(ang) * 2.5;
+                    ball.vy = Math.sin(ang) * 2.5;
+                }
+                this.tackleCd = 20;
+            }
+        }
+        
+        if (ballOwner === this) {
+            ball.x = this.x + Math.cos(this.facing) * (this.radius + ball.radius + 1);
+            ball.y = this.y + Math.sin(this.facing) * (this.radius + ball.radius + 1);
+            ball.vx = 0; ball.vy = 0;
+        }
+    }
+    
+    handleInput() {
+        this.vx = 0; this.vy = 0;
+        let moving = false;
+        
+        if (keys['arrowup'] || keys['w']) { this.vy = -this.speed; moving = true; }
+        if (keys['arrowdown'] || keys['s']) { this.vy = this.speed; moving = true; }
+        if (keys['arrowleft'] || keys['a']) { this.vx = -this.speed; moving = true; }
+        if (keys['arrowright'] || keys['d']) { this.vx = this.speed; moving = true; }
+        
+        if (moving) this.facing = Math.atan2(this.vy, this.vx);
+        
+        if (keys[' '] && ballOwner === this) {
+            chargingShot = true;
+            shotPower = Math.min(shotPower + 1.2, 100);
+            document.getElementById('powerMeter').classList.add('active');
+            document.getElementById('powerFill').style.width = shotPower + '%';
+        } else if (chargingShot && ballOwner === this) {
+            this.shoot();
+        }
+    }
+    
+    shoot() {
+        chargingShot = false;
+        shotPower = Math.max(shotPower, 20);
+        document.getElementById('powerMeter').classList.remove('active');
+        document.getElementById('powerFill').style.width = '0%';
+        
+        const targetX = this.team === 'blue' ? FIELD.x + FIELD.w + 30 : FIELD.x - 30;
+        const targetY = canvas.height / 2 + rand(-25, 25);
+        
+        const shootAccuracy = this.stats.shoot / 100;
+        const aimError = (1 - shootAccuracy) * (shotPower / 100) * 50;
+        const ang = angleBetween(this, { x: targetX, y: targetY + rand(-aimError, aimError) });
+        
+        const power = 5 + (shotPower / 100) * 12;
+        ball.vx = Math.cos(ang) * power;
+        ball.vy = Math.sin(ang) * power;
+        
+        this.hasBall = false;
+        ballOwner = null;
+        this.shootCd = 35;
+        this.matchStats.shots++;
+        shotPower = 0;
+        
+        // Check if this leads to a goal for assist tracking
+        lastGoalScorer = { shooter: this, time: gameTime };
+    }
+    
+    aiBehavior() {
+        this.vx = 0; this.vy = 0;
+        
+        const myGoal = this.team === 'blue' ? FIELD.x : FIELD.x + FIELD.w;
+        const theirGoal = this.team === 'blue' ? FIELD.x + FIELD.w : FIELD.x;
+        const hasPossession = ballOwner && ballOwner.team === this.team;
+        const theyHaveBall = ballOwner && ballOwner.team !== this.team;
+        const toBall = dist(this, ball);
+        
+        let targetX = this.homeX;
+        let targetY = this.homeY;
+        
+        // Role-based positioning
+        if (this.role === 'gk') {
+            const goalX = this.team === 'blue' ? FIELD.x + 35 : FIELD.x + FIELD.w - 35;
+            if (theyHaveBall) {
+                targetX = goalX;
+                targetY = clamp(ball.y, canvas.height/2 - FIELD.goalW/2 + 25, canvas.height/2 + FIELD.goalW/2 - 25);
+                const ballComing = (this.team === 'blue' && ball.vx < -3) || (this.team === 'cpu' && ball.vx > 3);
+                if (ballComing && Math.abs(ball.y - this.y) < 70) targetY = ball.y;
+            } else {
+                targetX = goalX;
+                targetY = canvas.height / 2;
+            }
+        } else if (hasPossession) {
+            if (this.hasBall) {
+                const toGoalDist = Math.abs(this.x - theirGoal);
+                const shootChance = (this.stats.shoot / 100) * 0.025;
+                
+                if (toGoalDist < 220 && Math.random() < shootChance && this.shootCd === 0) {
+                    this.aiShoot(theirGoal);
+                    return;
+                }
+                
+                const toGoal = angleBetween(this, { x: theirGoal, y: canvas.height/2 });
+                this.vx = Math.cos(toGoal) * this.speed * 0.75;
+                this.vy = Math.sin(toGoal) * this.speed * 0.75;
+                this.facing = toGoal;
+                
+                const nearestOpp = findNearestOpponent(this);
+                if (nearestOpp && dist(this, nearestOpp) < 55 && Math.random() < 0.04) {
+                    this.aiPass();
+                }
+            } else {
+                const carrier = ballOwner;
+                const supportAng = angleBetween(carrier, { x: theirGoal, y: canvas.height/2 });
+                const spread = (this.role === 'lw' || this.role === 'rw') ? 140 : 80;
+                targetX = carrier.x - Math.cos(supportAng) * 70;
+                targetY = carrier.y + (this.y < carrier.y ? -spread : spread);
+                
+                // Wingers stay wide
+                if (this.role === 'lw') targetY = Math.min(targetY, canvas.height/2 - 100);
+                if (this.role === 'rw') targetY = Math.max(targetY, canvas.height/2 + 100);
+            }
+        } else if (theyHaveBall) {
+            const ballCarrier = ballOwner;
+            
+            if (this.role === 'gk') {
+                // Already handled
+            } else if (this.role === 'cb' || this.role === 'lb' || this.role === 'rb') {
+                // Defenders track back and press
+                if (toBall < 160) {
+                    const ang = angleBetween(this, ball);
+                    this.vx = Math.cos(ang) * this.speed;
+                    this.vy = Math.sin(ang) * this.speed;
+                } else {
+                    targetX = lerp(this.homeX, ball.x, 0.25);
+                    targetY = lerp(this.homeY, ball.y, 0.25);
+                }
+            } else if (this.role === 'cdm' || this.role === 'cm') {
+                if (toBall < 180) {
+                    const ang = angleBetween(this, ball);
+                    this.vx = Math.cos(ang) * this.speed * 0.9;
+                    this.vy = Math.sin(ang) * this.speed * 0.9;
+                } else {
+                    targetX = lerp(this.homeX, ball.x, 0.3);
+                    targetY = lerp(this.homeY, ball.y, 0.3);
+                }
+            } else {
+                // Forwards press high
+                targetX = lerp(this.homeX, ball.x, 0.45);
+                targetY = ball.y;
+            }
+        } else {
+            // Loose ball
+            const ang = angleBetween(this, ball);
+            this.vx = Math.cos(ang) * this.speed * 1.1;
+            this.vy = Math.sin(ang) * this.speed * 1.1;
+        }
+        
+        if (this.vx === 0 && this.vy === 0) {
+            const dx = targetX - this.x, dy = targetY - this.y;
+            const d = Math.hypot(dx, dy);
+            if (d > 8) {
+                this.vx = (dx / d) * this.speed * 0.65;
+                this.vy = (dy / d) * this.speed * 0.65;
+            }
+        }
+        
+        if (this.vx !== 0 || this.vy !== 0) this.facing = Math.atan2(this.vy, this.vx);
+    }
+    
+    aiShoot(theirGoal) {
+        const accuracy = this.stats.shoot / 100;
+        const error = (1 - accuracy) * 30;
+        const ang = angleBetween(this, { x: theirGoal, y: canvas.height/2 + rand(-error, error) });
+        const power = 7 + (this.stats.shoot / 100) * 7;
+        ball.vx = Math.cos(ang) * power;
+        ball.vy = Math.sin(ang) * power;
+        this.hasBall = false;
+        ballOwner = null;
+        this.shootCd = 40;
+        this.matchStats.shots++;
+        lastGoalScorer = { shooter: this, time: gameTime };
+    }
+    
+    aiPass() {
+        const mates = players.filter(p => p.team === this.team && p !== this);
+        if (!mates.length) return;
+        
+        let best = mates[0], bestScore = -999;
+        const theirGoal = this.team === 'blue' ? FIELD.x + FIELD.w : FIELD.x;
+        
+        for (const tm of mates) {
+            const forward = (tm.x - this.x) * (this.team === 'blue' ? 1 : -1);
+            const d = dist(this, tm);
+            const open = !players.some(o => o.team !== this.team && dist(o, tm) < 40);
+            const score = forward * 1.5 - d * 0.3 + (open ? 40 : 0);
+            if (score > bestScore) { bestScore = score; best = tm; }
+        }
+        
+        const passAccuracy = this.stats.pass / 100;
+        const error = (1 - passAccuracy) * 20;
+        const ang = angleBetween(this, { x: best.x + rand(-error, error), y: best.y + rand(-error, error) });
+        const power = Math.min(9, dist(this, best) * 0.055 + 3);
+        ball.vx = Math.cos(ang) * power;
+        ball.vy = Math.sin(ang) * power;
+        this.hasBall = false;
+        ballOwner = null;
+        this.matchStats.passes++;
+        if (best.x > this.x && this.team === 'blue') this.matchStats.keyPasses++;
+    }
+    
+    draw() {
+        const sx = this.x - camera.x, sy = this.y - camera.y;
+        if (sx < -30 || sx > canvas.width + 30 || sy < -30 || sy > canvas.height + 30) return;
+        
+        // Shadow
+        ctx.fillStyle = 'rgba(0,0,0,0.3)';
+        ctx.beginPath();
+        ctx.ellipse(sx + 1, sy + 3, this.radius, this.radius * 0.45, 0, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Selection
+        if (this.team === 'blue' && players.indexOf(this) === selectedPlayerIdx) {
+            ctx.strokeStyle = '#ffeb3b';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(sx, sy, this.radius + 4, 0, Math.PI * 2);
+            ctx.stroke();
+        }
+        
+        // Body color by team
+        const color = this.team === 'blue' ? '#29b6f6' : '#ef5350';
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(sx, sy, this.radius, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Position highlight
+        ctx.fillStyle = 'rgba(255,255,255,0.25)';
+        ctx.beginPath();
+        ctx.arc(sx - 2, sy - 2, this.radius * 0.35, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Direction
+        if (Math.abs(this.vx) > 0.1 || Math.abs(this.vy) > 0.1) {
+            const ang = Math.atan2(this.vy, this.vx);
+            ctx.fillStyle = 'rgba(255,255,255,0.5)';
+            ctx.beginPath();
+            ctx.moveTo(sx + Math.cos(ang) * (this.radius + 3), sy + Math.sin(ang) * (this.radius + 3));
+            ctx.lineTo(sx + Math.cos(ang + 2.4) * (this.radius - 1), sy + Math.sin(ang + 2.4) * (this.radius - 1));
+            ctx.lineTo(sx + Math.cos(ang - 2.4) * (this.radius - 1), sy + Math.sin(ang - 2.4) * (this.radius - 1));
+            ctx.fill();
+        }
+        
+        // Name tag
+        ctx.fillStyle = 'rgba(0,0,0,0.6)';
+        ctx.font = '600 9px sans-serif';
+        ctx.textAlign = 'center';
+        const nameWidth = ctx.measureText(this.name).width + 6;
+        ctx.fillRect(sx - nameWidth/2, sy - this.radius - 14, nameWidth, 12);
+        ctx.fillStyle = 'white';
+        ctx.fillText(this.name, sx, sy - this.radius - 6);
+        
+        // Role badge
+        const roleColors = { gk: '#ff9800', lb: '#4caf50', cb: '#4caf50', rb: '#4caf50', cdm: '#9c27b0', cm: '#2196f3', lw: '#f44336', st: '#f44336', rw: '#f44336' };
+        ctx.fillStyle = roleColors[this.role] || '#888';
+        ctx.font = 'bold 7px sans-serif';
+        ctx.fillText(this.role.toUpperCase(), sx, sy + 2.5);
+    }
+}
+
+// ==================== TEAM SETUP ====================
+let players = [];
+
+function getFormationX(role, team) {
+    const isBlue = team === 'blue';
+    const base = isBlue ? FIELD.x : FIELD.x + FIELD.w;
+    const dir = isBlue ? 1 : -1;
+    const offsets = { gk: 40, lb: 130, cb: 130, rb: 130, cdm: 240, cm: 240, lw: 380, st: 420, rw: 380 };
+    return base + (offsets[role] || 200) * dir;
+}
+
+function getFormationY(role, index) {
+    const cy = canvas.height / 2;
+    const formations = {
+        gk: [0], lb: [-220], cb: [-70, 70], rb: [220],
+        cdm: [0], cm: [-100, 100], lw: [-180], st: [0], rw: [180]
+    };
+    const arr = formations[role] || [0];
+    return cy + arr[index % arr.length];
+}
+
+function initTeams() {
+    players = [];
+    let cbIdx = 0, cmIdx = 0;
+    
+    PLAYER_DB.blue.forEach((data, i) => {
+        const x = getFormationX(data.role, 'blue');
+        const y = getFormationY(data.role, data.role === 'cb' ? cbIdx++ : (data.role === 'cm' ? cmIdx++ : 0));
+        players.push(new Player(data, x, y, 'blue'));
+    });
+    
+    cbIdx = 0; cmIdx = 0;
+    PLAYER_DB.red.forEach((data, i) => {
+        const x = getFormationX(data.role, 'red');
+        const y = getFormationY(data.role, data.role === 'cb' ? cbIdx++ : (data.role === 'cm' ? cmIdx++ : 0));
+        players.push(new Player(data, x, y, 'red'));
+    });
+}
+
+// ==================== GAME FUNCTIONS ====================
+function findNearestOpponent(p) {
+    return players.filter(o => o.team !== p.team).sort((a, b) => dist(p, a) - dist(p, b))[0];
+}
+
+function switchPlayer() {
+    const myTeam = players.filter(p => p.team === 'blue');
+    const closest = myTeam.sort((a, b) => dist(a, ball) - dist(b, ball))[0];
+    selectedPlayerIdx = players.indexOf(closest);
+}
+
+function attemptPass() {
+    const me = players[selectedPlayerIdx];
+    if (ballOwner !== me) return;
+    
+    const mates = players.filter(p => p.team === 'blue' && p !== me);
+    if (!mates.length) return;
+    
+    let best = mates[0], bestScore = -999;
+    for (const m of mates) {
+        const forward = m.x - me.x;
+        const d = dist(me, m);
+        const open = !players.some(o => o.team !== 'blue' && dist(o, m) < 45);
+        const score = forward * 2 - d * 0.4 + (open ? 50 : 0);
+        if (score > bestScore) { bestScore = score; best = m; }
+    }
+    
+    const passAcc = me.stats.pass / 100;
+    const err = (1 - passAcc) * 15;
+    const ang = angleBetween(me, { x: best.x + rand(-err, err), y: best.y + rand(-err, err) });
+    const power = Math.min(10, dist(me, best) * 0.05 + 3.5);
+    ball.vx = Math.cos(ang) * power;
+    ball.vy = Math.sin(ang) * power;
+    me.hasBall = false;
+    ballOwner = null;
+    me.matchStats.passes++;
+    if (best.x > me.x) me.matchStats.keyPasses++;
+}
+
+function resetPositions(afterGoal = false) {
+    ball.x = canvas.width / 2; ball.y = canvas.height / 2;
+    ball.vx = 0; ball.vy = 0;
+    ballOwner = null;
+    
+    let cbIdx = 0, cmIdx = 0;
+    players.forEach(p => {
+        p.x = getFormationX(p.role, p.team);
+        p.y = getFormationY(p.role, p.role === 'cb' ? cbIdx++ : (p.role === 'cm' ? cmIdx++ : 0));
+        if (p.role === 'cb' || p.role === 'cm') { if (p.role === 'cb') cbIdx++; else cmIdx++; }
+        p.vx = 0; p.vy = 0;
+        p.hasBall = false;
+        p.stamina = Math.min(100, p.stamina + 25);
+    });
+    
+    if (afterGoal) {
+        gameState = 'kickoff';
+        setTimeout(() => { gameState = 'playing'; }, 1800);
+    }
+}
+
+function resetMatch() {
+    document.getElementById('postMatch').classList.remove('show');
+    score = { blue: 0, red: 0 };
+    gameTime = 0;
+    gameState = 'kickoff';
+    document.getElementById('scoreBlue').textContent = '0';
+    document.getElementById('scoreRed').textContent = '0';
+    players.forEach(p => {
+        p.matchStats = { goals: 0, assists: 0, passes: 0, tackles: 0, shots: 0, keyPasses: 0 };
+        p.distCovered = 0;
+    });
+    resetPositions();
+    setTimeout(() => { gameState = 'playing'; }, 1200);
+}
+
+function checkGoal() {
+    const goalTop = canvas.height / 2 - FIELD.goalW / 2;
+    const goalBottom = canvas.height / 2 + FIELD.goalW / 2;
+    
+    if (ball.x > FIELD.x + FIELD.w && ball.y > goalTop && ball.y < goalBottom) {
+        score.blue++;
+        document.getElementById('scoreBlue').textContent = score.blue;
+        
+        // Find who scored (last touch or closest)
+        let scorer = lastGoalScorer ? lastGoalScorer.shooter : players.filter(p => p.team === 'blue').sort((a, b) => dist(a, ball) - dist(b, ball))[0];
+        scorer.matchStats.goals++;
+        
+        // Assist check
+        if (lastGoalScorer && lastGoalScorer.time > gameTime - 3) {
+            // Simple: last passer before shooter
+        }
+        
+        addLog(`⚽ GOAL! ${scorer.name} scores for Galacticos!`, '#29b6f6');
+        showMessage("GOAL!\n" + scorer.name);
+        resetPositions(true);
+    }
+    
+    if (ball.x < FIELD.x && ball.y > goalTop && ball.y < goalBottom) {
+        score.red++;
+        document.getElementById('scoreRed').textContent = score.red;
+        
+        let scorer = lastGoalScorer ? lastGoalScorer.shooter : players.filter(p => p.team === 'red').sort((a, b) => dist(a, ball) - dist(b, ball))[0];
+        scorer.matchStats.goals++;
+        
+        addLog(`⚽ GOAL! ${scorer.name} scores for Legends!`, '#ef5350');
+        showMessage("GOAL!\n" + scorer.name);
+        resetPositions(true);
+    }
+}
+
+function calculateMOTM() {
+    let best = null, bestRating = 0;
+    
+    players.forEach(p => {
+        let rating = 6.0;
+        rating += p.matchStats.goals * 1.2;
+        rating += p.matchStats.assists * 0.8;
+        rating += p.matchStats.passes * 0.03;
+        rating += p.matchStats.tackles * 0.25;
+        rating += p.matchStats.shots * 0.08;
+        rating += p.distCovered * 0.02;
+        rating = Math.min(10, Math.max(4, rating));
+        
+        if (rating > bestRating) {
+            bestRating = rating;
+            best = p;
+        }
+    });
+    
+    return { player: best, rating: bestRating.toFixed(1) };
+}
+
+function showPostMatch() {
+    const motm = calculateMOTM();
+    const p = motm.player;
+    
+    document.getElementById('finalScore').textContent = `Galacticos ${score.blue} - ${score.red} Legends`;
+    document.getElementById('motmName').textContent = p.name;
+    document.getElementById('motmTeam').textContent = p.team === 'blue' ? 'Galacticos FC' : 'Legends FC';
+    document.getElementById('motmTeam').style.color = p.team === 'blue' ? '#29b6f6' : '#ef5350';
+    document.getElementById('motmRating').textContent = motm.rating;
+    document.getElementById('motmGoals').textContent = p.matchStats.goals;
+    document.getElementById('motmAssists').textContent = p.matchStats.assists;
+    document.getElementById('motmPasses').textContent = p.matchStats.passes;
+    document.getElementById('motmTackles').textContent = p.matchStats.tackles;
+    document.getElementById('motmDistance').textContent = p.distCovered.toFixed(1) + 'km';
+    
+    document.getElementById('postMatch').classList.add('show');
+    startConfetti();
+}
+
+// ==================== CONFETTI ====================
+function startConfetti() {
+    confetti = [];
+    for (let i = 0; i < 150; i++) {
+        confetti.push({
+            x: rand(0, confettiCanvas.width),
+            y: rand(-500, -10),
+            vx: rand(-2, 2),
+            vy: rand(1, 4),
+            color: `hsl(${rand(0, 360)}, 80%, 60%)`,
+            size: rand(3, 7),
+            rotation: rand(0, 360),
+            rotSpeed: rand(-5, 5)
+        });
+    }
+    animateConfetti();
+}
+
+function animateConfetti() {
+    if (!document.getElementById('postMatch').classList.contains('show')) return;
+    confettiCtx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
+    
+    confetti.forEach(c => {
+        c.x += c.vx;
+        c.y += c.vy;
+        c.rotation += c.rotSpeed;
+        if (c.y > confettiCanvas.height) c.y = -10;
+        
+        confettiCtx.save();
+        confettiCtx.translate(c.x, c.y);
+        confettiCtx.rotate(c.rotation * Math.PI / 180);
+        confettiCtx.fillStyle = c.color;
+        confettiCtx.fillRect(-c.size/2, -c.size/2, c.size, c.size);
+        confettiCtx.restore();
+    });
+    
+    requestAnimationFrame(animateConfetti);
+}
+
+// ==================== CAMERA & FIELD ====================
+function updateCamera() {
+    const targetX = ball.x - canvas.width / 2;
+    const targetY = ball.y - canvas.height / 2;
+    camera.x = lerp(camera.x, targetX, 0.07);
+    camera.y = lerp(camera.y, targetY, 0.07);
+    camera.x = clamp(camera.x, -80, FIELD.w + FIELD.x - canvas.width + 80);
+    camera.y = clamp(camera.y, -60, FIELD.h + FIELD.y - canvas.height + 60);
+}
+
+function drawField() {
+    const cx = -camera.x, cy = -camera.y;
+    
+    ctx.fillStyle = '#111';
+    ctx.fillRect(cx - 100, cy - 100, FIELD.w + 200, FIELD.h + 200);
+    
+    // Crowd
+    ctx.fillStyle = '#1a1a1a';
+    for (let i = 0; i < 300; i++) {
+        const rx = cx + rand(-50, FIELD.w + 100);
+        const ry = cy + rand(-50, FIELD.h + 100);
+        if (rx < cx + FIELD.x || rx > cx + FIELD.x + FIELD.w || ry < cy + FIELD.y || ry > cy + FIELD.y + FIELD.h) {
+            ctx.fillStyle = `hsl(${rand(0, 360)}, 40%, ${rand(20, 40)}%)`;
+            ctx.fillRect(rx, ry, 3, 3);
+        }
+    }
+    
+    // Grass stripes
+    const stripeW = 70;
+    for (let i = 0; i < FIELD.w; i += stripeW) {
+        ctx.fillStyle = (i / stripeW) % 2 === 0 ? '#3a7d24' : '#327020';
+        ctx.fillRect(cx + FIELD.x + i, cy + FIELD.y, stripeW, FIELD.h);
+    }
+    
+    // Lines
+    ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+    ctx.lineWidth = 2.5;
+    ctx.strokeRect(cx + FIELD.x, cy + FIELD.y, FIELD.w, FIELD.h);
+    
+    ctx.beginPath();
+    ctx.moveTo(cx + canvas.width / 2, cy + FIELD.y);
+    ctx.lineTo(cx + canvas.width / 2, cy + FIELD.y + FIELD.h);
+    ctx.stroke();
+    
+    ctx.beginPath();
+    ctx.arc(cx + canvas.width / 2, cy + canvas.height / 2, 65, 0, Math.PI * 2);
+    ctx.stroke();
+    
+    ctx.fillStyle = 'white';
+    ctx.beginPath();
+    ctx.arc(cx + canvas.width / 2, cy + canvas.height / 2, 3.5, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Penalty boxes
+    const penW = 150, penH = 260;
+    ctx.strokeRect(cx + FIELD.x, cy + canvas.height / 2 - penH / 2, penW, penH);
+    ctx.strokeRect(cx + FIELD.x + FIELD.w - penW, cy + canvas.height / 2 - penH / 2, penW, penH);
+    
+    // Goals
+    ctx.fillStyle = 'rgba(255,255,255,0.12)';
+    ctx.fillRect(cx + FIELD.x - FIELD.goalD, cy + canvas.height / 2 - FIELD.goalW / 2, FIELD.goalD, FIELD.goalW);
+    ctx.strokeRect(cx + FIELD.x - FIELD.goalD, cy + canvas.height / 2 - FIELD.goalW / 2, FIELD.goalD, FIELD.goalW);
+    ctx.fillRect(cx + FIELD.x + FIELD.w, cy + canvas.height / 2 - FIELD.goalW / 2, FIELD.goalD, FIELD.goalW);
+    ctx.strokeRect(cx + FIELD.x + FIELD.w, cy + canvas.height / 2 - FIELD.goalW / 2, FIELD.goalD, FIELD.goalW);
+    
+    // Net pattern
+    ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+    ctx.lineWidth = 0.8;
+    for (let i = 0; i < FIELD.goalW; i += 10) {
+        ctx.beginPath(); ctx.moveTo(cx + FIELD.x - FIELD.goalD, cy + canvas.height/2 - FIELD.goalW/2 + i); ctx.lineTo(cx + FIELD.x, cy + canvas.height/2 - FIELD.goalW/2 + i); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(cx + FIELD.x + FIELD.w, cy + canvas.height/2 - FIELD.goalW/2 + i); ctx.lineTo(cx + FIELD.x + FIELD.w + FIELD.goalD, cy + canvas.height/2 - FIELD.goalW/2 + i); ctx.stroke();
+    }
+}
+
+function updateTimer() {
+    const mins = Math.floor(gameTime / 60);
+    const secs = Math.floor(gameTime % 60);
+    document.getElementById('timer').textContent = 
+        String(mins).padStart(2, '0') + ':' + String(secs).padStart(2, '0');
+}
+
+// ==================== MAIN LOOP ====================
+function gameLoop(timestamp) {
+    const dt = (timestamp - lastTime) / 1000;
+    lastTime = timestamp;
+    
+    if (gameState === 'playing') {
+        gameTime += dt;
+        
+        if (gameTime >= HALF_TIME && gameTime < HALF_TIME + dt * 2) {
+            showMessage("HALF TIME", 2500);
+            gameState = 'halftime';
+            setTimeout(() => { resetPositions(); gameState = 'playing'; }, 2500);
+        }
+        
+        if (gameTime >= MATCH_LENGTH) {
+            gameState = 'ended';
+            const winner = score.blue > score.red ? "GALACTICOS WIN!" : 
+                          score.red > score.blue ? "LEGENDS WIN!" : "DRAW!";
+            showMessage("FULL TIME\n" + winner, 3000);
+            setTimeout(showPostMatch, 3000);
+        }
+    }
+    
+    if (gameState === 'playing' || gameState === 'kickoff') {
+        players.forEach(p => p.update());
+        ball.update();
+        checkGoal();
+        updateCamera();
+        
+        const selected = players[selectedPlayerIdx];
+        if (!ballOwner && dist(selected, ball) > 140) {
+            const myTeam = players.filter(p => p.team === 'blue');
+            const closest = myTeam.sort((a, b) => dist(a, ball) - dist(b, ball))[0];
+            if (dist(closest, ball) < dist(selected, ball) - 60) {
+                selectedPlayerIdx = players.indexOf(closest);
+            }
+        }
+    }
+    
+    ctx.fillStyle = '#080808';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    drawField();
+    players.forEach(p => p.draw());
+    ball.draw();
+    updateTimer();
+    
+    if (gameState === 'kickoff') {
+        ctx.fillStyle = 'rgba(0,0,0,0.45)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = 'white';
+        ctx.font = 'bold 22px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText("KICK OFF", canvas.width / 2, canvas.height / 2);
+    }
+    
+    requestAnimationFrame(gameLoop);
+}
+
+// ==================== INIT ====================
+initTeams();
+setTimeout(() => { gameState = 'playing'; }, 1200);
+showMessage("KICK OFF\nGalacticos vs Legends");
+requestAnimationFrame(gameLoop);
+</script>
+</body>
+</html>
